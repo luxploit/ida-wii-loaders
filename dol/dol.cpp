@@ -142,7 +142,7 @@ void idaapi load_file(linput_t *fp, ushort /*neflag*/, const char * /*fileformat
     if (dhdr.addressText[i] == 0) continue;
     
     // create a name according to segmenttype and number
-    sprintf(buf, NAME_CODE "%u", snum);
+    qsnprintf(buf, 50, NAME_CODE "%u", snum);
     
     // add the code segment
     if (!add_segm(1, dhdr.addressText[i], dhdr.addressText[i]+dhdr.sizeText[i], buf, CLASS_CODE)) qexit(1);
@@ -162,7 +162,7 @@ void idaapi load_file(linput_t *fp, ushort /*neflag*/, const char * /*fileformat
     if (dhdr.addressData[i] == 0) continue;
 
     // create a name according to segmenttype and number
-    sprintf(buf, NAME_DATA "%u", snum);
+    qsnprintf(buf, 50, NAME_DATA "%u", snum);
 
     // add the data segment
     if (!add_segm(1, dhdr.addressData[i], dhdr.addressData[i]+dhdr.sizeData[i], buf, CLASS_DATA)) qexit(1);

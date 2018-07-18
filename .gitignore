@@ -2,4 +2,4 @@ Release
 *.swp
 *.suo
 *.user
-
+.vs/

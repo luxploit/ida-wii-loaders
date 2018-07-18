@@ -117,6 +117,22 @@ bool rel_track::read_sections()
   return true;
 }
 
+uint32_t rel_track::get_header_size() const
+{
+    if (m_version < 2)
+    {
+        return 0x40;
+    }
+    else if (m_version == 2)
+    {
+        return 0x48;
+    }
+    else
+    {
+        return 0x4C;
+    }
+}
+
 bool rel_track::validate_header() const
 {
   // Check for absurd amount of sections
@@ -137,7 +153,7 @@ bool rel_track::validate_header() const
 bool rel_track::verify_section(uint32_t offset, uint32_t size) const
 {
   offset = SECTION_OFF(offset);
-  return sizeof(relhdr) <= offset && (offset + size) <= m_max_filesize;
+  return get_header_size() <= offset && (offset + size) <= m_max_filesize;
 }
 
 bool rel_track::is_good() const

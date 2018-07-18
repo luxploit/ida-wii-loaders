@@ -32,6 +32,7 @@ private:
   bool read_sections();
   bool verify_section(uint32_t offset, uint32_t size) const;
 
+  uint32_t get_header_size() const;
   bool validate_header() const;
 
   bool create_sections(bool dry_run = false);
