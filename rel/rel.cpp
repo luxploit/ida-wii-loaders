@@ -8,7 +8,6 @@
 #include "rel_track.h"
 
 
-
 /*-----------------------------------------------------------------
 *
 *   Check if input file can be a rel file. The supposed header
@@ -17,18 +16,18 @@
 *
 */
 
-int idaapi accept_file(linput_t *fp, char fileformatname[MAX_FILE_FORMAT_NAME], int n)
+int idaapi accept_file(qstring *fileFormatName, qstring *processor, linput_t *li, const char *filename)
 {
-  if (n) return(0);
-
-  rel_track test_valid(fp);
+  rel_track test_valid(li);
 
   // Check if valid
   if (!test_valid.is_good())
     return 0;
 
   // file has passed all sanity checks and might be a rel
-  qstrncpy(fileformatname, "Nintendo REL", MAX_FILE_FORMAT_NAME);
+  fileFormatName->sprnt("Nintendo REL");
+  processor->sprnt("PPC");
+
   return(ACCEPT_FIRST | 0xD07);
 }
 
@@ -50,17 +49,15 @@ void idaapi load_file(linput_t *fp, ushort neflag, const char * /*fileformatname
 
   // we need PowerPC support to do anything with rels
   if (ph.id != PLFM_PPC)
-    set_processor_type("PPC", SETPROC_ALL | SETPROC_FATAL);
+    set_processor_type("PPC", setproc_level_t::SETPROC_LOADER);
 
   set_compiler_id(COMP_GNU);
 
   rel_track track(fp);
-  inf.beginEA = START;
+  inf.start_ea = START;
 
   // map selector 1 to 0
   set_selector(1, 0);
-
-
 
   track.apply_patches();
 }

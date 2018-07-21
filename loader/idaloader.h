@@ -1,3 +1,6 @@
+#define USE_STANDARD_FILE_FUNCTIONS 1
+#define __X64__ 1
+
 #ifndef __IDA_LOADER_H__
 #define __IDA_LOADER_H__
 
@@ -9,7 +12,7 @@
 #include <bytes.hpp>
 #include <offset.hpp>
 #include <segment.hpp>
-#include <srarea.hpp>
+#include <segregs.hpp>
 #include <fixup.hpp>
 #include <entry.hpp>
 #include <auto.hpp>
@@ -29,5 +32,18 @@
 
 #define CLASS_EXTERN  "XTRN"
 #define NAME_EXTERN   ".ref"
+
+inline bool err_msg(const char *format, ...)
+{
+    va_list va;
+    va_start(va, format);
+
+    std::string fmt_nl = format;
+    fmt_nl += "\n";
+
+    int nbytes = vmsg(fmt_nl.c_str(), va);
+    va_end(va);
+    return false;
+}
 
 #endif //#ifndef __IDA_LOADER_H__

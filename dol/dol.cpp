@@ -6,38 +6,7 @@
 
 #include "../loader/idaloader.h"
 #include "dol.h"
-
-/*--------------------------------------------------------------------------
- *
- *   Read the header of the (possible) DOL file into memory. Swap all bytes
- *   because the file is stored as big endian.
- *
- */
-
-int read_header(linput_t *fp, dolhdr *dhdr)
-{
-  int i;
-
-  // read in dolheader
-  qlseek(fp, 0, SEEK_SET);
-  if(qlread(fp, dhdr, sizeof(dolhdr)) != sizeof(dolhdr)) return(0);
-
-  // convert header
-  for (i=0; i<7; i++) {
-    dhdr->offsetText[i] = swap32(dhdr->offsetText[i]);
-    dhdr->addressText[i] = swap32(dhdr->addressText[i]);
-    dhdr->sizeText[i] = swap32(dhdr->sizeText[i]);
-  }
-  for (i=0; i<11; i++) {
-    dhdr->offsetData[i] = swap32(dhdr->offsetData[i]);
-    dhdr->addressData[i] = swap32(dhdr->addressData[i]);
-    dhdr->sizeData[i] = swap32(dhdr->sizeData[i]);
-  }
-  dhdr->entrypoint = swap32(dhdr->entrypoint);
-  dhdr->sizeBSS = swap32(dhdr->sizeBSS);
-  dhdr->addressBSS = swap32(dhdr->addressBSS);
-  return(1);
-}
+#include "dol_track.h"
 
 /*--------------------------------------------------------------------------
  *
@@ -47,56 +16,21 @@ int read_header(linput_t *fp, dolhdr *dhdr)
  *
  */
 
-int idaapi accept_file(linput_t *fp, char fileformatname[MAX_FILE_FORMAT_NAME], int n)
+int idaapi accept_file(qstring *fileFormatName, qstring *processor, linput_t *li, const char *fileName)
 {
-  int i;
+    dol_track track(li);
 
-  dolhdr dhdr;
-  ulong filelen, valid = 0;
+    if (!track.is_good())
+    {
+        msg("File is not a Nintendo GameCube DOL!");
+        return 0;
+    }
 
-  if(n) return(0);
+    // file has passed all sanity checks and might be a DOL
+    fileFormatName->sprnt("Nintendo GameCube DOL");
+    processor->sprnt("PPC");
 
-  // first get the lenght of the file
-  
-  filelen = qlsize(fp);
-  // if to short for a DOL header then this is no DOL
-  if (filelen < 0x100) return(0);
-
-  // read DOL header from file
-  if (read_header(fp, &dhdr)==0) return(0);
-  
-  // now perform some sanitychecks
-  for (i=0; i<7; i++) {
-    
-    // DOL segment MAY NOT physically stored in the header
-    if (dhdr.offsetText[i]!=0 && dhdr.offsetText[i]<0x100) return(0);
-    // end of physical storage must be within file
-    if (dhdr.offsetText[i]+dhdr.sizeText[i]>filelen) return(0);
-    // we only accept DOLs with segments above 2GB
-    if (dhdr.addressText[i] != 0 && !(dhdr.addressText[i] & 0x80000000)) return(0);
-
-    // remember that entrypoint was in a code segment
-    if (dhdr.entrypoint >= dhdr.addressText[i] && dhdr.entrypoint < dhdr.addressText[i]+dhdr.sizeText[i]) valid = 1;
-  }
-  for (i=0; i<11; i++) {
-
-    // DOL segment MAY NOT physically stored in the header
-    if (dhdr.offsetData[i]!=0 && dhdr.offsetData[i]<0x100) return(0);
-    // end of physical storage must be within file
-    if (dhdr.offsetData[i]+dhdr.sizeData[i]>filelen) return(0);
-    // we only accept DOLs with segments above 2GB
-    if (dhdr.addressData[i] != 0 && !(dhdr.addressData[i] & 0x80000000)) return(0);
-  }
-  
-  // if there is a BSS segment it must be above 2GB, too
-  if (dhdr.addressBSS != 0 && !(dhdr.addressBSS & 0x80000000)) return(0);
-  
-  // if entrypoint is not within a code segment reject this file
-  if (!valid) return(0);
-
-  // file has passed all sanity checks and might be a DOL
-  qstrncpy(fileformatname, "Nintendo GameCube DOL", MAX_FILE_FORMAT_NAME);
-  return(ACCEPT_FIRST | 0xD07);
+    return(ACCEPT_FIRST | 0xD07);
 }
 
 
@@ -110,10 +44,6 @@ int idaapi accept_file(linput_t *fp, char fileformatname[MAX_FILE_FORMAT_NAME], 
 
 void idaapi load_file(linput_t *fp, ushort /*neflag*/, const char * /*fileformatname*/)
 {
-  dolhdr dhdr;
-  uint snum;
-  int i;
-
   // Hello here I am
   msg("---------------------------------------\n");
   msg("Nintendo GameCube DOL Loader Plugin 0.1\n");
@@ -121,68 +51,75 @@ void idaapi load_file(linput_t *fp, ushort /*neflag*/, const char * /*fileformat
   
   // we need PowerPC support otherwise we cannot do much with DOLs
   if ( ph.id != PLFM_PPC )
-    set_processor_type("PPC", SETPROC_ALL|SETPROC_FATAL);
+    set_processor_type("PPC", setproc_level_t::SETPROC_LOADER);
 
   set_compiler_id(COMP_GNU);
 
+  dol_track track(fp);
+
   // read DOL header into memory
-  if (read_header(fp, &dhdr)==0) qexit(1);
+  if (!track.is_good())
+      qexit(1);
   
   // every journey has a beginning
-  inf.beginEA = inf.startIP = dhdr.entrypoint;
+  inf.start_ea = inf.start_ip = track.header.entrypoint;
 
   // map selector 1 to 0
   set_selector(1, 0);
 
   // create all code segments
-  for (i=0, snum=1; i<7; i++, snum++) {
-    char buf[50];
+  for (uint i=0, snum=1; i < 7; i++, snum++) {
+    qstring buf;
     
     // 0 == no segment
-    if (dhdr.addressText[i] == 0) continue;
+    if (track.header.addressText[i] == 0)
+        continue;
     
     // create a name according to segmenttype and number
-    qsnprintf(buf, 50, NAME_CODE "%u", snum);
+    buf.sprnt(NAME_CODE "%u", snum);
     
     // add the code segment
-    if (!add_segm(1, dhdr.addressText[i], dhdr.addressText[i]+dhdr.sizeText[i], buf, CLASS_CODE)) qexit(1);
+    if (!add_segm(1, track.header.addressText[i], track.header.addressText[i] + track.header.sizeText[i], buf.c_str(), CLASS_CODE))
+        qexit(1);
     
     // set addressing to 32 bit
-    set_segm_addressing(getseg(dhdr.addressText[i]), 1);
+    set_segm_addressing(getseg(track.header.addressText[i]), 1);
 
     // and get the content from the file
-    file2base(fp, dhdr.offsetText[i], dhdr.addressText[i], dhdr.addressText[i]+dhdr.sizeText[i], FILEREG_PATCHABLE);
+    file2base(fp, track.header.offsetText[i], track.header.addressText[i], track.header.addressText[i ]+ track.header.sizeText[i], FILEREG_PATCHABLE);
   }
 
   // create all data segments
-  for (i=0, snum=1; i<11; i++, snum++) {
-    char buf[50];
+  for (uint i = 0, snum = 1; i < 11; i++, snum++) {
+    qstring buf;
 
     // 0 == no segment
-    if (dhdr.addressData[i] == 0) continue;
+    if (track.header.addressData[i] == 0)
+        continue;
 
     // create a name according to segmenttype and number
-    qsnprintf(buf, 50, NAME_DATA "%u", snum);
+    buf.sprnt(NAME_DATA "%u", snum);
 
     // add the data segment
-    if (!add_segm(1, dhdr.addressData[i], dhdr.addressData[i]+dhdr.sizeData[i], buf, CLASS_DATA)) qexit(1);
+    if (!add_segm(1, track.header.addressData[i], track.header.addressData[i] + track.header.sizeData[i], buf.c_str(), CLASS_DATA))
+        qexit(1);
     
     // set addressing to 32 bit
-    set_segm_addressing(getseg(dhdr.addressData[i]), 1);
+    set_segm_addressing(getseg(track.header.addressData[i]), 1);
 
     // and get the content from the file
-    file2base(fp, dhdr.offsetData[i], dhdr.addressData[i], dhdr.addressData[i]+dhdr.sizeData[i], FILEREG_PATCHABLE);
+    file2base(fp, track.header.offsetData[i], track.header.addressData[i], track.header.addressData[i] + track.header.sizeData[i], FILEREG_PATCHABLE);
   }
 
   // is there a BSS defined?
-  if (dhdr.addressBSS != NULL) {
+  if (track.header.addressBSS != NULL) {
     // then add it
-    if(!add_segm(1, dhdr.addressBSS, dhdr.addressBSS+dhdr.sizeBSS, NAME_BSS, CLASS_BSS)) qexit(1);
+    if(!add_segm(1, track.header.addressBSS, track.header.addressBSS + track.header.sizeBSS, NAME_BSS, CLASS_BSS))
+        qexit(1);
 
     // and set addressing mode to 32 bit
-    set_segm_addressing(getseg(dhdr.addressBSS), 1);
+    set_segm_addressing(getseg(track.header.addressBSS), 1);
   }
- 
 }
 
 /*--------------------------------------------------------------------------

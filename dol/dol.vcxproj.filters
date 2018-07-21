@@ -18,12 +18,18 @@
     <ClCompile Include="dol.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="dol_track.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="dol.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\loader\idaloader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="dol_track.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

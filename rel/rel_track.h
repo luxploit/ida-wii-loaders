@@ -5,7 +5,7 @@
 #include <vector>
 #include <map>
 
-#define BASENAME "_BASE_"
+#define BASENAME "_MAIN_"
 
 struct fxn_naming_entry
 {
@@ -65,6 +65,7 @@ private:
   //
 
   bool m_valid;
+  bool m_dol_file_loaded;
   uint32_t m_max_filesize;
   linput_t * m_input_file;
 
