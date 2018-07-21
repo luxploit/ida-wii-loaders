@@ -3,8 +3,8 @@
 The REL and DOL files are found in Nintendo Gamecube/Wii games. This repository is focused on loading the REL files.
 
 ## Environment
-* Visual C++ 2010 Express
-* IDA Pro 6.1 SDK
+* Visual C++ 2017 Community
+* IDA Pro 7.0 SDK
 
 ## DOL Loader
 A fork of the DOL loader by Stefan Esser, source from [here](http://hitmen.c02.at/html/gc_tools.html).
