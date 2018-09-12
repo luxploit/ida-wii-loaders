@@ -21,6 +21,7 @@ A rewrite/fork of the RSO loader by Stephen Simpson, source from [here](https://
 * Identifies exported functions (prolog, epilog, unresolved).
 * Treats relocations to external modules as imports.
 * Reads other modules in the same folder as the target module to map ids to names and obtain correct import offsets.
+* Allows selecting of a `symbol map` file on analysis to load meaningful function & variable names.
 
 ## Apploader Loader
 Loads Apploader.img files into IDA.
@@ -30,9 +31,9 @@ Loads Apploader.img files into IDA.
 * Sets the entrypoint function name.
 
 ### Limitations
-Since the apploader is a raw image (.text, .rodata, .data, .bss, etc), everything is set as text (code). This means that IDA will likely find false code positives during analyzation. You'll have to fix those manually.
+Since the apploader is a raw image (.text, .rodata, .data, .bss, etc), everything is set as text (code). This means that IDA will likely find false code positives during analysis. You'll have to fix those manually.
 
 ## Planned (TODOs)
-* Read exported `.map` files to give meaningful names to externals.
+* Support symbol loading for externals & DOLs.
 * Make imports appear in the imports tab.
 * Allow some settings such as relocating to any base (?).

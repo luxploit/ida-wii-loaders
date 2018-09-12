@@ -195,6 +195,11 @@ bool rel_track::apply_patches(bool dry_run)
   if ( !this->apply_names(dry_run) )
     return err_msg("Naming failed");
 
+  // Assign function names
+  if (!this->apply_symbols(dry_run)) {
+      return err_msg("Function naming failed!");
+  }
+
   return true;
 }
 
@@ -640,4 +645,179 @@ uint32_t rel_track::get_external_offset(std::string const &modulename, uint32_t 
   }
 
   return section_offset + offset;
+}
+
+qstring get_line_map_info(const qstring& line, uint32_t* address, uint32_t* size, uint32_t* vaddress, uint32_t* alignment) {
+    // TODO: handle other column counts (2 & 4, others?)
+    // TODO: Do I want to add the object in the name? If not, I'll have to strip it.
+    size_t length = line.length();
+    char name[512], container[512];
+    size_t isEntry = line.find("(entry of ");
+    if (length > 27 && line[27] != ' ' && isEntry) {
+        *alignment = 0;
+        qsscanf(line.c_str(), "%08x %06x %08x %511s", address, size, vaddress, name);
+        if (isEntry != qstring::npos && line[isEntry + 10] != '\.') {
+            qsscanf(line.c_str() + isEntry + 10, "%511s", container);
+            char* end = qstrchr(container, ')');
+            end[0] = '\0';
+            qstrncat(container, "::", 512);
+            qstrncat(container, name, 512);
+            qstrncpy(name, container, 512);
+        }
+    }
+    else {
+        qsscanf(line.c_str(), "%08x %06x %08x %i %511s", address, size, vaddress, alignment, name);
+        //msg("Symbol Loader: Entry name: %s\n", name);
+    }
+
+    return qstring(name);
+}
+
+bool get_file_map_info(FILE* file, std::map<qstring, uint32_t>* fileMap) {
+    // Check that a symbol map even exists
+    qfseek(file, 0, SEEK_END);
+    uint64_t fileSize = qftell(file);
+    msg("Symbol Loader: Map File Size: %08X\n", fileSize);
+
+    // If there's less than 0x800 bytes, it's probably not a valid symbol map.
+    if (fileSize < 0x800) {
+        return err_msg("Symbol Loader: Symbol file was too small to be a symbol map!\n");
+    }
+
+    qfseek(file, -0x800, SEEK_END); // Seek to a good spot shortly before the end of the file.
+
+    // Start looking for "Memory map:"
+    qstring line;
+    while (qgetline(&line, file) != -1) {
+        if (line.find("Memory map:") != qstring::npos) break;
+    }
+
+    if (qgetline(&line, file) == -1) return false; // memory map was empty
+
+    std::map<qstring, uint32_t> map;
+    uint32_t address, size, fileAddress;
+    uint32_t currentOffset = START;
+    qstring temp(line.c_str());
+    do {
+        // Skip the next two lines
+        if (line.find("Starting") != qstring::npos || line.find("address") != qstring::npos ||
+            temp.trim2().empty()) continue; // TODO: Find a better way of checking a qstring for empty.
+
+        qsscanf(line.substr(19).c_str(), "%08x %08x %08x", &address, &size, &fileAddress);
+        auto name = line.substr(0, 19).trim2();
+        msg("Symbol Loader: Section found! Name: %s | Address: %08X | Size: %08X | File Address: %08X\n", name.c_str(), address, size, fileAddress);
+
+        // Only add the section if the size is greater than 0.
+        if (size != 0) {
+            map[name] = currentOffset;
+            currentOffset += size;
+            msg("Symbol Loader: Added section %s at file address %08X!\n", name.c_str(), START + fileAddress);
+        }
+
+    } while (qgetline(&line, file) != -1);
+
+    // Seek back to the beginning of the file
+    qfseek(file, 0, SEEK_SET);
+    *fileMap = map;
+    return true;
+}
+
+bool rel_track::apply_symbols(bool dry_run) {
+    char* fileLocation = ask_file(false, NULL, "FILTER Symbol Map|*.map\nSelect a Symbol Map...");
+    if (fileLocation != NULL) {
+        FILE* symbolFile = fopenRT(fileLocation);
+        if (symbolFile != NULL) {
+            qstring line;
+
+            uint32_t sectionAddress = START;
+            qstring section;
+
+            uint32_t address, size, vaddress, alignment;
+            qstring name;
+            qstring currName;
+
+            bool skipSection = false;
+            bool textSection = false;
+            bool bssSection = false;
+
+            std::map<qstring, uint32_t> fileMap;
+            if (!get_file_map_info(symbolFile, &fileMap)) return false;
+
+            while (qgetline(&line, symbolFile) != -1) {
+                if (line.find("Memory map:") != qstring::npos) break; // We've reached the end of the symbol map.
+                size_t end = line.find(" section layout");
+                if (end != qstring::npos) {
+                    // Looks like we're starting a new section.
+
+                    section = line.substr(0, end).trim2();
+                    skipSection = false;
+                    textSection = section == ".text";
+                    bssSection = section == ".bss";
+
+                    bool foundSection = false;
+                    for (auto const& entry : fileMap) {
+                        if (entry.first == section) {
+                            sectionAddress = entry.second;
+                            foundSection = true;
+                            msg("Symbol Loader: Switched to section %s at offset %08X!\n", section.c_str(), sectionAddress);
+                            break;
+                        }
+                    }
+
+                    if (!foundSection) {
+                        skipSection = true;
+                        msg("Symbol Loader: Failed to find a file offset for section %s! Skipping section!\n",
+                            section.c_str());
+                    }
+                }
+                else if (skipSection ||
+                    line.find("Starting        Virtual") != qstring::npos ||
+                    line.find("address  Size   address") != qstring::npos ||
+                    line.find("-----------------------") != qstring::npos ||
+                    line.find(section.c_str()) != qstring::npos ||
+                    line.trim2().empty()) continue;
+                else
+                {
+                    name = get_line_map_info(line, &address, &size, &vaddress, &alignment);
+                    uint32_t virtualAddress = sectionAddress + address;
+                    if (name == section || name.empty()) continue; // We don't want to bother with these objects.
+
+                    if (!bssSection && (virtualAddress + size < START || (virtualAddress + size) >= (START + m_max_filesize))) {
+                        msg("Symbol Loader: Failed to import symbol \"%s\"! Address was out of bounds at %08X!\n", name.c_str(), virtualAddress);
+                        continue;
+                    }
+
+                    // Set the entry's name
+                    if (get_name(&currName, virtualAddress) < 1) {
+                        if (!set_name(virtualAddress, name.c_str(), SN_NOWARN | SN_FORCE)) {
+                            // The name might already exist. Try it again after appending the address onto it.
+                            msg("Symbol Loader: Unable to set name %s for object at address %08X! Trying again with a modified name!\n",
+                                name.c_str(), virtualAddress);
+                            name.append(qsnprintf("_", 16, "%x", address));
+                            if (!set_name(virtualAddress, name.c_str(), SN_NOWARN | SN_FORCE)) {
+                                msg("Symbol Loader: Unable to set name %s for object at address %08X\n", name.c_str(), virtualAddress);
+                            }
+                        }
+                    }
+                    else {
+                        msg("Symbol Loader: Attempted to overwrite a name [%s] with [%s] that already existed at offset %08X\n",
+                            name.c_str(), currName.c_str(), virtualAddress);
+                        continue;
+                    }
+
+                    // Create a function if in the text section
+                    if (textSection) {
+                        add_func(virtualAddress, virtualAddress + size);
+                    }
+
+                    // TODO: Comments?
+                }
+            }
+
+            msg("Symbol Loader: Symbol file was successfully loaded!\n");
+            qfclose(symbolFile);
+            return true;
+        }
+    }
+    return false;
 }

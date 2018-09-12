@@ -45,7 +45,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>$(IDASDK_DIR)\include;$(IDASDK_DIR)\ldr;$(IncludePath)</IncludePath>
     <LibraryPath>$(IDASDK_DIR)\lib\x86_win_vc_32;$(LibraryPath)</LibraryPath>
-    <TargetExt>.ldw</TargetExt>
+    <TargetExt>.dll</TargetExt>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>

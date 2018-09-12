@@ -38,6 +38,7 @@ private:
   bool create_sections(bool dry_run = false);
   bool apply_relocations(bool dry_run = false);
   bool apply_names(bool dry_run = false);
+  bool apply_symbols(bool dry_run = false);
 
   // Initializes the name and module resolvers
   void init_resolvers();
