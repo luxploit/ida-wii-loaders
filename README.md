@@ -1,13 +1,13 @@
-# REL & DOL Loader plugins for IDA Pro
+# REL, DOL, & Apploader Loader plugins for IDA Pro
 
-The REL and DOL files are found in Nintendo Gamecube/Wii games. This repository is focused on loading the REL files.
+The REL, DOL, & Apploader files are found in Nintendo Gamecube/Wii games.
 
 ## Environment
 * Visual C++ 2017 Community
 * IDA Pro 7.0 SDK
 
 ## DOL Loader
-A fork of the DOL loader by Stefan Esser, source from [here](http://hitmen.c02.at/html/gc_tools.html).
+A modified fork of the DOL loader by Stefan Esser, source from [here](http://hitmen.c02.at/html/gc_tools.html).
 
 ### Changes
 * Currently none (will consider bug fixes)
@@ -22,6 +22,15 @@ A rewrite/fork of the RSO loader by Stephen Simpson, source from [here](https://
 * Treats relocations to external modules as imports.
 * Reads other modules in the same folder as the target module to map ids to names and obtain correct import offsets.
 
+## Apploader Loader
+Loads Apploader.img files into IDA.
+
+### Features
+* Creates boot & trailer .text sections.
+* Sets the entrypoint function name.
+
+### Limitations
+Since the apploader is a raw image (.text, .rodata, .data, .bss, etc), everything is set as text (code). This means that IDA will likely find false code positives during analyzation. You'll have to fix those manually.
 
 ### Planned (TODOs)
 * Read exported `.map` files to give meaningful names to externals.
