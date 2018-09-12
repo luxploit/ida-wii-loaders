@@ -32,7 +32,7 @@ Loads Apploader.img files into IDA.
 ### Limitations
 Since the apploader is a raw image (.text, .rodata, .data, .bss, etc), everything is set as text (code). This means that IDA will likely find false code positives during analyzation. You'll have to fix those manually.
 
-### Planned (TODOs)
+## Planned (TODOs)
 * Read exported `.map` files to give meaningful names to externals.
 * Make imports appear in the imports tab.
 * Allow some settings such as relocating to any base (?).
