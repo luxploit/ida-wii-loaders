@@ -88,6 +88,8 @@ bool dol_track::validate_header()
     // if there is a BSS segment it must be above 2GB, too
     if (header.addressBSS != 0 && !(header.addressBSS & 0x80000000)) 
         return err_msg("DOL: There appears to be a .bss segment, but its address isn't in a valid address space of >= 0x80000000 (was %X)", header.addressBSS);
+
+    return m_valid;
 }
 
 bool dol_track::is_good() const

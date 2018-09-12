@@ -49,7 +49,7 @@ void idaapi load_file(linput_t *fp, ushort neflag, const char * /*fileformatname
 
   // we need PowerPC support to do anything with rels
   if (ph.id != PLFM_PPC)
-    set_processor_type("PPC", setproc_level_t::SETPROC_LOADER);
+    set_processor_type("ppc", setproc_level_t::SETPROC_LOADER);
 
   set_compiler_id(COMP_GNU);
 
