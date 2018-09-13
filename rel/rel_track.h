@@ -21,6 +21,7 @@ public:
   rel_track();
   rel_track(linput_t *p_input);
 
+  uint32_t get_base_address();
   bool is_good() const;
 
   //section_entry const * get_section(uint entry_id) const;
@@ -39,6 +40,9 @@ private:
   bool apply_relocations(bool dry_run = false);
   bool apply_names(bool dry_run = false);
   bool apply_symbols(bool dry_run = false);
+
+  qstring get_line_map_info(const qstring& line, uint32_t* address, uint32_t* size, uint32_t* vaddress, uint32_t* alignment);
+  bool get_file_map_info(FILE* file, std::map<qstring, uint32_t>* fileMap);
 
   // Initializes the name and module resolvers
   void init_resolvers();
@@ -65,6 +69,7 @@ private:
   uint32_t m_rel_offset;
   //
 
+  uint32_t m_base_address = START_DEFAULT;
   bool m_valid;
   bool m_dol_file_loaded;
   uint32_t m_max_filesize;

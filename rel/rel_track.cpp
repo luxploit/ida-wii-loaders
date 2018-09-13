@@ -42,6 +42,10 @@ rel_track::rel_track(linput_t *p_input)
   m_valid = true;
 }
 
+uint32_t rel_track::get_base_address() {
+    return m_base_address;
+}
+
 bool rel_track::read_header()
 {
   // Read header data from input
@@ -204,50 +208,45 @@ bool rel_track::apply_patches(bool dry_run)
 }
 
 
-bool rel_track::create_sections(bool dry_run)
-{
-  m_next_seg_offset = START;
+bool rel_track::create_sections(bool dry_run) {
+    if (!ask_addr(&m_next_seg_offset, "Enter a base address for this module."))
+        m_next_seg_offset = START_DEFAULT;
+    else
+        m_base_address = m_next_seg_offset;
 
-  // Create sections
-  for (size_t i = 0; i < m_sections.size(); ++i)
-  {
-    auto & entry = m_sections[i];
+    // Create sections
+    for (size_t i = 0; i < m_sections.size(); ++i) {
+        auto & entry = m_sections[i];
 
-    // Skip unused
-    if ( entry.file_offset == 0 && entry.size == 0 )
-      continue;
+        // Skip unused
+        if ( entry.file_offset == 0 && entry.size == 0 ) continue;
 
-    std::string type = (entry.file_offset & SECTION_EXEC) ? CLASS_CODE : CLASS_DATA;
-    std::string name = (entry.file_offset & SECTION_EXEC) ? NAME_CODE : NAME_DATA;
-    name += std::to_string(static_cast<unsigned long long>(i));
+        std::string type = (entry.file_offset & SECTION_EXEC) ? CLASS_CODE : CLASS_DATA;
+        std::string name = (entry.file_offset & SECTION_EXEC) ? NAME_CODE : NAME_DATA;
+        name += std::to_string(static_cast<unsigned long long>(i));
 
-    m_segment_address_map[i] = m_next_seg_offset;   // record the loaded segment address
-    uint32_t foffset = SECTION_OFF(entry.file_offset);
+        m_segment_address_map[i] = m_next_seg_offset;   // record the loaded segment address
+        uint32_t foffset = SECTION_OFF(entry.file_offset);
 
-    // Create the segment
-    if ( foffset != 0 )  // known segment
-    {
-      //if ( foffset < m_next_seg_offset )
-        //return err_msg("Segments are not linear (seg #%u)", i);
+        // Create the segment
+        if ( foffset != 0 ) { // known segment
+            if (!add_segm(1, m_next_seg_offset, m_next_seg_offset + entry.size, name.c_str(), type.c_str()))
+                return err_msg("Failed to create segment #%u", i);
 
-      if (!add_segm(1, m_next_seg_offset, m_next_seg_offset + entry.size, name.c_str(), type.c_str()))
-        return err_msg("Failed to create segment #%u", i);
+            if (!file2base(m_input_file, foffset, m_next_seg_offset, m_next_seg_offset + entry.size, FILEREG_PATCHABLE))
+                return err_msg("Failed to pull data from file (segment #%u)", i);
+        }
+        else { // .bss section
+            m_internal_bss_section = i;
 
-      if (!file2base(m_input_file, foffset, m_next_seg_offset, m_next_seg_offset + entry.size, FILEREG_PATCHABLE))
-        return err_msg("Failed to pull data from file (segment #%u)", i);
+            if (!add_segm(1, m_next_seg_offset, m_next_seg_offset + entry.size, NAME_BSS, CLASS_BSS))
+                return err_msg("Failed to create BSS segment #%u", i);
+        }
+
+        set_segm_addressing(getseg(m_next_seg_offset), 1);
+        m_next_seg_offset += entry.size;
     }
-    else  // .bss section
-    {
-      m_internal_bss_section = i;
-
-      if (!add_segm(1, m_next_seg_offset, m_next_seg_offset + entry.size, NAME_BSS, CLASS_BSS))
-        return err_msg("Failed to create BSS segment #%u", i);
-    }
-
-    set_segm_addressing(getseg(m_next_seg_offset), 1);
-    m_next_seg_offset += entry.size;
-  }
-  return true;
+    return true;
 }
 bool rel_track::apply_relocations(bool dry_run)
 {
@@ -641,13 +640,13 @@ uint32_t rel_track::get_external_offset(std::string const &modulename, uint32_t 
   if ( virt )
   {
     section_offset -= first_offset;
-    section_offset += START;
+    section_offset += m_base_address;
   }
 
   return section_offset + offset;
 }
 
-qstring get_line_map_info(const qstring& line, uint32_t* address, uint32_t* size, uint32_t* vaddress, uint32_t* alignment) {
+qstring rel_track::get_line_map_info(const qstring& line, uint32_t* address, uint32_t* size, uint32_t* vaddress, uint32_t* alignment) {
     // TODO: handle other column counts (2 & 4, others?)
     // TODO: Do I want to add the object in the name? If not, I'll have to strip it.
     size_t length = line.length();
@@ -673,7 +672,7 @@ qstring get_line_map_info(const qstring& line, uint32_t* address, uint32_t* size
     return qstring(name);
 }
 
-bool get_file_map_info(FILE* file, std::map<qstring, uint32_t>* fileMap) {
+bool rel_track::get_file_map_info(FILE* file, std::map<qstring, uint32_t>* fileMap) {
     // Check that a symbol map even exists
     qfseek(file, 0, SEEK_END);
     uint64_t fileSize = qftell(file);
@@ -696,7 +695,7 @@ bool get_file_map_info(FILE* file, std::map<qstring, uint32_t>* fileMap) {
 
     std::map<qstring, uint32_t> map;
     uint32_t address, size, fileAddress;
-    uint32_t currentOffset = START;
+    uint32_t currentOffset = m_base_address;
     qstring temp(line.c_str());
     do {
         // Skip the next two lines
@@ -711,7 +710,7 @@ bool get_file_map_info(FILE* file, std::map<qstring, uint32_t>* fileMap) {
         if (size != 0) {
             map[name] = currentOffset;
             currentOffset += size;
-            msg("Symbol Loader: Added section %s at file address %08X!\n", name.c_str(), START + fileAddress);
+            msg("Symbol Loader: Added section %s at file address %08X!\n", name.c_str(), m_base_address + fileAddress);
         }
 
     } while (qgetline(&line, file) != -1);
@@ -732,7 +731,7 @@ bool rel_track::apply_symbols(bool dry_run) {
         if (symbolFile != NULL) {
             qstring line;
 
-            uint32_t sectionAddress = START;
+            uint32_t sectionAddress = m_base_address;
             qstring section;
 
             uint32_t address, size, vaddress, alignment;
@@ -785,7 +784,7 @@ bool rel_track::apply_symbols(bool dry_run) {
                     uint32_t virtualAddress = sectionAddress + address;
                     if (name == section || name.empty()) continue; // We don't want to bother with these objects.
 
-                    if (!bssSection && (virtualAddress + size < START || (virtualAddress + size) >= (START + m_max_filesize))) {
+                    if (!bssSection && (virtualAddress + size < m_base_address || (virtualAddress + size) >= (m_base_address + m_max_filesize))) {
                         msg("Symbol Loader: Failed to import symbol \"%s\"! Address was out of bounds at %08X!\n", name.c_str(), virtualAddress);
                         continue;
                     }

@@ -54,7 +54,7 @@ void idaapi load_file(linput_t *fp, ushort neflag, const char * /*fileformatname
   set_compiler_id(COMP_GNU);
 
   rel_track track(fp);
-  inf.start_ea = START;
+  inf.start_ea = track.get_base_address();
 
   // map selector 1 to 0
   set_selector(1, 0);
