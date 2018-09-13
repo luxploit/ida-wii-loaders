@@ -723,6 +723,9 @@ bool get_file_map_info(FILE* file, std::map<qstring, uint32_t>* fileMap) {
 }
 
 bool rel_track::apply_symbols(bool dry_run) {
+    if (ask_yn(ASKBTN_YES, "Would you like to load a Symbol Map for this file?") != ASKBTN_YES)
+        return false;
+
     char* fileLocation = ask_file(false, NULL, "FILTER Symbol Map|*.map\nSelect a Symbol Map...");
     if (fileLocation != NULL) {
         FILE* symbolFile = fopenRT(fileLocation);
