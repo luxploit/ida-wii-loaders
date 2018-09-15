@@ -44,31 +44,33 @@ int idaapi accept_file(qstring *fileFormatName, qstring *processor, linput_t *li
 
 void idaapi load_file(linput_t *fp, ushort /*neflag*/, const char * /*fileformatname*/)
 {
-  // Hello here I am
-  msg("---------------------------------------\n");
-  msg("Nintendo GameCube DOL Loader Plugin 0.1\n");
-  msg("---------------------------------------\n");
+    msg("---------------------------------------\n");
+    msg("Nintendo GameCube DOL Loader Plugin 0.1\n");
+    msg("---------------------------------------\n");
   
-  // we need PowerPC support otherwise we cannot do much with DOLs
-  if ( ph.id != PLFM_PPC )
-    set_processor_type("PPC", setproc_level_t::SETPROC_LOADER);
+    // We need PowerPC support to do anything with rels
+    set_processor_type("ppc:PAIRED", setproc_level_t::SETPROC_LOADER);
 
-  set_compiler_id(COMP_GNU);
+    // Set lis+addi resolution to aggressive
+    int lisres = 1;
+    ph.set_idp_options("PPC_LISOFF", IDPOPT_BIT, &lisres);
 
-  dol_track track(fp);
+    set_compiler_id(COMP_GNU);
 
-  // read DOL header into memory
-  if (!track.is_good())
-      qexit(1);
+    dol_track track(fp);
+
+    // read DOL header into memory
+    if (!track.is_good())
+        qexit(1);
   
-  // every journey has a beginning
-  inf.start_ea = inf.start_ip = track.header.entrypoint;
+    // every journey has a beginning
+    inf.start_ea = inf.start_ip = track.header.entrypoint;
 
-  // map selector 1 to 0
-  set_selector(1, 0);
+    // map selector 1 to 0
+    set_selector(1, 0);
 
-  // create all code segments
-  for (uint i=0, snum=1; i < 7; i++, snum++) {
+    // create all code segments
+    for (uint i=0, snum=1; i < 7; i++, snum++) {
     qstring buf;
     
     // 0 == no segment

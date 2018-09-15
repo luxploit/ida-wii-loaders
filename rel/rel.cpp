@@ -42,24 +42,26 @@ int idaapi accept_file(qstring *fileFormatName, qstring *processor, linput_t *li
 
 void idaapi load_file(linput_t *fp, ushort neflag, const char * /*fileformatname*/)
 {
-  // Hello here I am
-  msg("---------------------------------------\n");
-  msg("Nintendo REL Loader Plugin 0.1\n");
-  msg("---------------------------------------\n");
+    msg("---------------------------------------\n");
+    msg("Nintendo REL Loader Plugin 0.1\n");
+    msg("---------------------------------------\n");
 
-  // we need PowerPC support to do anything with rels
-  if (ph.id != PLFM_PPC)
-    set_processor_type("ppc", setproc_level_t::SETPROC_LOADER);
+    // We need PowerPC support to do anything with rels
+    set_processor_type("ppc:PAIRED", SETPROC_LOADER);
 
-  set_compiler_id(COMP_GNU);
+    // Set lis+addi resolution to aggressive
+    int lisres = 1;
+    ph.set_idp_options("PPC_LISOFF", IDPOPT_BIT, &lisres);
 
-  rel_track track(fp);
-  inf.start_ea = track.get_base_address();
+    set_compiler_id(COMP_GNU);
 
-  // map selector 1 to 0
-  set_selector(1, 0);
+    rel_track track(fp);
+    inf.start_ea = track.get_base_address();
 
-  track.apply_patches();
+    // map selector 1 to 0
+    set_selector(1, 0);
+
+    track.apply_patches();
 }
 
 /*-----------------------------------------------------------------
