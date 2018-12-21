@@ -179,8 +179,8 @@ bool rel_track::is_good() const
 
 ea_t rel_track::section_address(uint8_t section, uint32_t offset) const
 {
-  auto it = m_segment_address_map.find(section);
-  if ( it == m_segment_address_map.end() )
+  auto it = m_section_address_map.find(section);
+  if ( it == m_section_address_map.end() )
     return BADADDR;
   return it->second + offset;
 }
@@ -216,7 +216,10 @@ bool rel_track::create_sections(bool dry_run) {
 
     // Create sections
     for (size_t i = 0; i < m_sections.size(); ++i) {
-        auto & entry = m_sections[i];
+        auto& entry = m_sections[i];
+
+        // Add every section to the section address map.
+        m_section_address_map[i] = entry.size == 0 ? 0 : m_next_seg_offset;
 
         // Skip unused
         if ( entry.file_offset == 0 && entry.size == 0 ) continue;
@@ -248,6 +251,7 @@ bool rel_track::create_sections(bool dry_run) {
     }
     return true;
 }
+
 bool rel_track::apply_relocations(bool dry_run)
 {
   this->init_resolvers(); // initialize user-names
@@ -255,6 +259,7 @@ bool rel_track::apply_relocations(bool dry_run)
   // Apply relocations
   if (m_import_offset > 0)
   {
+    msg("Applying REL file relocations! Import table offset: %08X | Relocation entry table offset: %08X\n", m_import_offset, m_rel_offset);
     uint32_t count = m_import_size / sizeof(import_entry);
     uint32_t desired_import_size = 0;
     std::map< std::string, std::map<uint32_t, ea_t> > imports_map;
@@ -272,6 +277,9 @@ bool rel_track::apply_relocations(bool dry_run)
       // Endianness
       entry.offset = swap32(entry.offset);
       entry.id = swap32(entry.id);
+
+      // Debug info
+      msg("Applying relocations for import %d starting at file offset %08X\n", entry.id, entry.offset);
 
       // Seek to relocations
       qlseek(m_input_file, entry.offset, SEEK_SET);
@@ -298,11 +306,14 @@ bool rel_track::apply_relocations(bool dry_run)
             break;
 
           current_offset += rel.offset;
+
           switch (rel.type)
           {
           case R_DOLPHIN_SECTION:
             current_section = rel.section;
             current_offset  = 0;
+
+            msg("REL: Switched to section %u! Section Address = %08X\n", current_section, m_section_address_map[rel.section]);
             break;
           case R_DOLPHIN_NOP:
             break;

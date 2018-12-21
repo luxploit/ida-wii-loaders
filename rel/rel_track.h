@@ -86,6 +86,7 @@ private:
   std::map<uint32_t,std::string> m_module_names;
   std::map<uint32_t, std::map<uint32_t,std::string> > m_function_names;
   std::map<uint8_t, uint32_t> m_segment_address_map;
+  std::map<uint8_t, uint32_t> m_section_address_map;
 
   std::map<std::string, rel_track> m_external_modules;
 
