@@ -51,9 +51,13 @@ void idaapi load_file(linput_t *fp, ushort /*neflag*/, const char * /*fileformat
     // We need PowerPC support to do anything with rels
     set_processor_type("ppc:PAIRED", setproc_level_t::SETPROC_LOADER);
 
+    // setup 32-bit more for hexppc64 (crd: emoose)
+    EAH.setup(false);
+    inf_set_64bit(false);
+
     // Set lis+addi resolution to aggressive
     int lisres = 1;
-    ph.set_idp_options("PPC_LISOFF", IDPOPT_BIT, &lisres);
+    PH.set_idp_options("PPC_LISOFF", IDPOPT_BIT, &lisres);
 
     set_compiler_id(COMP_GNU);
 
@@ -62,9 +66,10 @@ void idaapi load_file(linput_t *fp, ushort /*neflag*/, const char * /*fileformat
     // read DOL header into memory
     if (!track.is_good())
         qexit(1);
-  
+
     // every journey has a beginning
-    inf.start_ea = inf.start_ip = track.header.entrypoint;
+    inf_set_start_ea(track.header.entrypoint);
+    inf_set_start_ip(track.header.entrypoint);
 
     // map selector 1 to 0
     set_selector(1, 0);

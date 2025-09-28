@@ -49,14 +49,18 @@ void idaapi load_file(linput_t *fp, ushort neflag, const char * /*fileformatname
     // We need PowerPC support to do anything with rels
     set_processor_type("ppc:PAIRED", SETPROC_LOADER);
 
+    // setup 32-bit more for hexppc64 (crd: emoose)
+    EAH.setup(false);
+    inf_set_64bit(false);
+
     // Set lis+addi resolution to aggressive
     int lisres = 1;
-    ph.set_idp_options("PPC_LISOFF", IDPOPT_BIT, &lisres);
+    PH.set_idp_options("PPC_LISOFF", IDPOPT_BIT, &lisres);
 
     set_compiler_id(COMP_GNU);
 
     rel_track track(fp);
-    inf.start_ea = track.get_base_address();
+    inf_set_start_ea(track.get_base_address());
 
     // map selector 1 to 0
     set_selector(1, 0);

@@ -3,8 +3,8 @@
 The REL, DOL, & Apploader files are found in Nintendo Gamecube/Wii games.
 
 ## Environment
-* Visual C++ 2017 Community
-* IDA Pro 7.0 SDK
+* Visual Studio 2022
+* IDA Pro 9.1 SDK
 
 ## DOL Loader
 A modified fork of the DOL loader by Stefan Esser, source from [here](http://hitmen.c02.at/html/gc_tools.html).

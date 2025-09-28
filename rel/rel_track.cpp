@@ -601,6 +601,20 @@ int idaapi enum_modules_cb(char const * file, rel_track * owner)
   return 0;
 }
 
+// Visitor class for handling .rel files
+struct rel_file_visitor_t : public file_enumerator_t
+{
+    rel_track* self;
+
+    rel_file_visitor_t(rel_track* s) : self(s) {}
+
+    // called for every file that matches
+    virtual int idaapi visit_file(const char* file) override
+    {
+        return enum_modules_cb(file, self); // keep your existing callback logic
+    }
+};
+
 void rel_track::init_resolvers()
 {
   std::string path;
@@ -611,10 +625,11 @@ void rel_track::init_resolvers()
     msg("REL: Unable to get directory of idb file.\n");
   path = dir;
 
-  // Load the module names
-  m_module_names.clear();
-  enumerate_files(nullptr, 0, path.c_str(), "*.rel", reinterpret_cast<int(idaapi*)(char const*,void*)>(&enum_modules_cb), this);
 
+  // Load the module names
+  rel_file_visitor_t fv(this);
+  m_module_names.clear();
+  enumerate_files(nullptr, 0, path.c_str(), "*.rel", fv);
 
   /*std::ifstream modid(path + "/module_id.txt");
   while( modid >> id >> name )

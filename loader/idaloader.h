@@ -20,6 +20,7 @@
 #include <kernwin.hpp>
 #include <nalt.hpp>
 #include <typeinf.hpp>
+#include <idp.hpp>
 
 #define CLASS_CODE    "CODE"
 #define NAME_CODE     ".text"
